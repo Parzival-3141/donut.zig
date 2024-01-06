@@ -39,8 +39,8 @@ pub fn main() !void {
     var rot_x: f32 = 0; // A
     var rot_z: f32 = 0; // B
     while (true) : ({
-        rot_x += 0.1;
-        rot_z += 0.1;
+        rot_x += 0.05;
+        rot_z += 0.05;
         if (rot_x > 2 * PI) rot_x = 0;
         if (rot_z > 2 * PI) rot_z = 0;
     }) {
