@@ -9,7 +9,8 @@ const R2 = 3;
 /// Distance from camera to the viewing plane. Determines FOV.
 // Calculated based off screen size to ensure torus fills the frame
 // without clipping the borders.
-const K1 = screen_width * K2 * 3 / (8 * (R1 + R2));
+const K1x = screen_width * K2 * 3 / (8 * (R1 + R2));
+const K1y = screen_height * K2 * 3 / (8 * (R1 + R2));
 
 /// Distance of the donut from the camera
 const K2 = 15;
@@ -20,8 +21,8 @@ const PI = 3.1415926;
 const theta_increment = 0.07;
 const phi_increment = 0.02;
 
-const screen_width = 50;
-const screen_height = 50;
+const screen_width = 70;
+const screen_height = screen_width / 2;
 
 /// Render buffer
 var r_buffer = [_]u8{' '} ** (screen_width * screen_height);
@@ -32,17 +33,15 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
 
     // disable cursor and clear screen
-    _ = try stdout.write("\x1B[?25l");
-    _ = try stdout.write("\x1B[2J");
+    try stdout.writeAll("\x1B[?25l");
+    try stdout.writeAll("\x1B[2J");
 
     // rotation in radians along x and z axis
-    var rot_x: f32 = 0; // A
-    var rot_z: f32 = 0; // B
+    var rot_x: f32 = 0;
+    var rot_z: f32 = 0;
     while (true) : ({
         rot_x += 0.05;
-        rot_z += 0.05;
-        if (rot_x > 2 * PI) rot_x = 0;
-        if (rot_z > 2 * PI) rot_z = 0;
+        rot_z += 0.03;
     }) {
         const cos_rot_x = @cos(rot_x);
         const sin_rot_x = @sin(rot_x);
@@ -78,14 +77,23 @@ pub fn main() !void {
                 const inverse_z = 1 / (K2 + torus_z);
 
                 // project point from world-space into screen-space
-                const scrn_x: usize = @intFromFloat(screen_width / 2 + (K1 * inverse_z * torus_x));
-                const scrn_y: usize = @intFromFloat(screen_height / 2 - (K1 * inverse_z * torus_y)); // y is negated since in 3D +y is up, but in 2D -y is up
+                const scrn_x: usize = @intFromFloat(screen_width / 2 + (K1x * inverse_z * torus_x));
+                const scrn_y: usize = @intFromFloat(screen_height / 2 - (K1y * inverse_z * torus_y)); // y is negated since in 3D +y is up, but in 2D -y is up.
 
                 // The dot product of the surface normal and a light vector
                 // above and behind the camera (0, 1, -1). The light vector
                 // should be normalized but we handle it below. A mouthful, but correct.
-                const luminance = cos_phi * cos_theta * sin_rot_z - cos_rot_x * cos_theta * sin_phi -
-                    sin_rot_x * sin_theta + cos_rot_z * (cos_rot_x * sin_theta - cos_theta * sin_rot_x * sin_phi);
+                const luminance = (cos_phi * cos_theta * sin_rot_z) - (cos_rot_x * cos_theta * sin_phi) -
+                    (sin_rot_x * sin_theta) + (cos_rot_z * (cos_rot_x * sin_theta - cos_theta * sin_rot_x * sin_phi));
+
+                // TODO: some foreground points have <0 luminance when they should be
+                // bright. Not entirely sure why, but the effect is exacerbated at higher
+                // render resolutions.
+                // const screen_idx = scrn_x + screen_width * scrn_y;
+                // if (inverse_z > z_buffer[screen_idx] and luminance < 0) {
+                //     r_buffer[screen_idx] = if (z_buffer[screen_idx] != 0) 'f' else ' ';
+                //     z_buffer[screen_idx] = inverse_z;
+                // } else
 
                 // luminance ranges from -sqrt(2) to +sqrt(2).
                 // If it's < 0 the surface is pointing away from us, so it's not worth rendering.
@@ -94,8 +102,6 @@ pub fn main() !void {
                     // test the z-buffer, a larger inverse_z means the point is closer to the camera.
                     if (inverse_z > z_buffer[screen_idx]) {
                         z_buffer[screen_idx] = inverse_z;
-                        // r_buffer[screen_idx] = '0' + @as(u8, @intFromFloat(10 * inverse_z));
-
                         // multiplying luminance by 8 and casting to an integer puts it in the 0..11 range (8*sqrt(2) == 11.3).
                         r_buffer[screen_idx] = ".,-~:;=!*#$@"[@intFromFloat(luminance * 8)];
                     }
@@ -104,7 +110,7 @@ pub fn main() !void {
         }
 
         // reset cursor position
-        _ = try stdout.write("\x1B[0;0H");
+        try stdout.writeAll("\x1B[0;0H");
 
         // dump r_buffer to screen
         for (0..screen_height) |y| {
@@ -113,11 +119,11 @@ pub fn main() !void {
 
         @memset(&r_buffer, ' '); // clear r_buffer
         @memset(&z_buffer, 0); // clear z_buffer
-        std.time.sleep(16 * std.time.ns_per_ms);
+        // std.time.sleep(16 * std.time.ns_per_ms); // uncomment to add a frame delay if it's spinning too fast
     }
 
     // reset terminal
-    _ = try stdout.write("\x1B[0m");
+    try stdout.writeAll("\x1B[0m");
 }
 
 const std = @import("std");
