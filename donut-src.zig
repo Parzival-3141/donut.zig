@@ -110,7 +110,7 @@ pub fn main() !void {
         }
 
         // reset cursor position
-        try stdout.writeAll("\x1B[0;0H");
+        try stdout.writeAll("\x1B[H");
 
         // dump r_buffer to screen
         for (0..screen_height) |y| {
@@ -123,7 +123,7 @@ pub fn main() !void {
     }
 
     // reset terminal
-    try stdout.writeAll("\x1B[0m");
+    try stdout.writeAll("\x1B[25h");
 }
 
 const std = @import("std");
